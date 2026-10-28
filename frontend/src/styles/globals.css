@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+@import 'flowbite-react/plugin/tailwindcss';
+
+@source "../../.flowbite-react/class-list.json";
+
+body {
+  margin: 0px !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
+
+  form button {
+    min-height: 44px;
+  }
+}
