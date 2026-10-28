@@ -46,8 +46,8 @@ export function userSignUpAuth(data: SignupData) {
   return authenticate('signup', data);
 }
 
-export function userLoginAuth(email: string, password: string) {
-  return authenticate('login', { email, password });
+export function userLoginAuth(email: string, password: string, role: 'user' | 'admin') {
+  return authenticate('login', { email, password, role });
 }
 
 export function clearAuth() {

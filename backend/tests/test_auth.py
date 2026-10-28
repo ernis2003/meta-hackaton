@@ -96,7 +96,7 @@ class AuthTests(unittest.TestCase):
             self.assertEqual(crud.get_user(self.db, first['id'])['hashed_password'],
                              first['hashed_password'])
         result = self.client.post('/api/login', json={
-            'email': 'admin@example.com', 'password': 'demo-password',
+            'email': 'admin@example.com', 'password': 'demo-password', 'role': 'admin',
         })
         self.assertEqual(result.status_code, 200)
         headers = {'Authorization': 'Bearer ' + result.json()['access_token']}
@@ -109,6 +109,31 @@ class AuthTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 seed_admin(self.db)
         self.assertEqual(crud.get_user_by_email(self.db, 'user@example.com')['role'], 'user')
+
+    def test_login_requires_matching_account_type(self):
+        self.register()
+        for role, expected in [('user', 200), ('admin', 403)]:
+            result = self.client.post('/api/login', json={
+                'email': 'user@example.com', 'password': 'test-password', 'role': role,
+            })
+            self.assertEqual(result.status_code, expected)
+            if expected != 200:
+                self.assertNotIn('access_token', result.json())
+
+        user = crud.get_user_by_email(self.db, 'user@example.com')
+        crud.update_user(self.db, user['id'], role='admin')
+        for role, expected in [('user', 403), ('admin', 200)]:
+            result = self.client.post('/api/login', json={
+                'email': user['email'], 'password': 'test-password', 'role': role,
+            })
+            self.assertEqual(result.status_code, expected)
+            if expected != 200:
+                self.assertNotIn('access_token', result.json())
+        result = self.client.post('/api/login', json={
+            'email': user['email'], 'password': 'test-password',
+        })
+        self.assertEqual(result.status_code, 403)
+        self.assertNotIn('access_token', result.json())
 
     def test_authorization_and_disabled_users(self):
         self.register()

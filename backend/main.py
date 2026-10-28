@@ -46,6 +46,8 @@ def login(data: LoginRequest, db=Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail='Incorrect email or password',
                             headers={'WWW-Authenticate': 'Bearer'})
+    if user['role'] != data.role:
+        raise HTTPException(status_code=403, detail='This account cannot sign in with the selected account type. Select the correct User or Admin tab.')
     return {'access_token': create_access_token(user['id']), 'user': user}
 
 

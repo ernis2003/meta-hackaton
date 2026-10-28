@@ -16,7 +16,7 @@ type LoginType = {
 const Login = ({ loginAdmin, setloginAdmin }: LoginType) => {
   const navigate = useNavigate();
   const [isModalOpen, setisModalOpen] = useState(false);
-  const [isActiveUser, setisActiveUser] = useState(true);
+  const [isActiveUser, setisActiveUser] = useState(!loginAdmin);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,7 +27,11 @@ const Login = ({ loginAdmin, setloginAdmin }: LoginType) => {
     setIsSubmitting(true);
     const data = new FormData(event.currentTarget);
     try {
-      const result = await userLoginAuth(String(data.get('email')), String(data.get('password')));
+      const result = await userLoginAuth(
+        String(data.get('email')),
+        String(data.get('password')),
+        isActiveUser ? 'user' : 'admin',
+      );
       setloginAdmin(result.user.role === 'admin');
       navigate(result.user.role === 'admin' ? '/admin/getUsers' : '/user/dashboard', {
         replace: true,

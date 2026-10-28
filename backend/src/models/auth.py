@@ -1,7 +1,7 @@
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-class LoginRequest(BaseModel):
+class Credentials(BaseModel):
     model_config = ConfigDict(extra='forbid')
     email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=1, max_length=1024)
@@ -15,7 +15,11 @@ class LoginRequest(BaseModel):
         return value
 
 
-class SignupRequest(LoginRequest):
+class LoginRequest(Credentials):
+    role: Literal['user', 'admin'] = 'user'
+
+
+class SignupRequest(Credentials):
     password: str = Field(min_length=8, max_length=1024)
     name: str = Field(min_length=1, max_length=100)
     surname: str = Field(min_length=1, max_length=100)
