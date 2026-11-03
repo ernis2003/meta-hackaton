@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / '.env')
 
-DATABASE_PATH = Path(os.getenv('DATABASE_PATH', str(BACKEND_DIR / 'data' / 'app.sqlite3')))
+DATABASE_PATH = Path(os.getenv('DATABASE_PATH', str(BACKEND_DIR / 'src' / 'database' / 'migrations' / 'app.sqlite3')))
+if not DATABASE_PATH.is_absolute():
+    DATABASE_PATH = BACKEND_DIR / DATABASE_PATH
 SECRET_KEY = os.getenv('JWT_SECRET_KEY', '')
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 30

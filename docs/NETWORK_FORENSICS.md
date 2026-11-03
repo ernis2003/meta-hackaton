@@ -24,6 +24,11 @@ and optionally `ZEEK_BIN=/opt/zeek/bin/zeek`. On Windows Docker is the default.
 
 ## Processing and storage
 
+SQLite data now defaults to `backend/src/database/migrations/app.sqlite3`.
+Relative `DATABASE_PATH` values resolve from `backend`, regardless of the
+launch directory. Database files in that folder are ignored by Git; migration
+SQL files remain versioned and must be included when sharing the repository.
+
 The request creates a pending record, commits processing, validates and analyzes
 the capture in a private temporary directory, parses every record within the
 200 MiB cumulative log limit, derives relationships, and commits the entities
