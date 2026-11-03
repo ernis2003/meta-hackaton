@@ -5,7 +5,7 @@ import ModalView from '../../shared/Modal';
 import ForgotPasswordUI from '../../business/ForgotPasswordUI';
 
 import { userLoginAuth } from '../../../utils/auth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, type FormEvent } from 'react';
 
 type LoginType = {
@@ -15,6 +15,7 @@ type LoginType = {
 
 const Login = ({ loginAdmin, setloginAdmin }: LoginType) => {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [isModalOpen, setisModalOpen] = useState(false);
   const [isActiveUser, setisActiveUser] = useState(true);
   const [error, setError] = useState('');
@@ -65,6 +66,14 @@ const Login = ({ loginAdmin, setloginAdmin }: LoginType) => {
         onSubmit={handleLogin}
         className="ms-auto me-auto max-w-md w-[100%] flex flex-col gap-6"
       >
+        {params.get('session') === 'expired' && (
+          <Alert
+            alertType="warning"
+            alertTitle="Session expired"
+            alertInfo="Please sign in again to view your saved analyses."
+            onClose={() => setParams({}, { replace: true })}
+          />
+        )}
         {error && (
           <Alert
             alertType="danger"

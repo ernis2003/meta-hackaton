@@ -5,6 +5,8 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import validate_settings
+from src.pcap_analysis import router as pcap_router
+from src.analyses import router as analyses_router
 from src.database import get_db, init_db
 from src.database import crud
 from src.database.connection import connect
@@ -26,6 +28,8 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title='Forensics API', version='1.0.0', lifespan=lifespan)
+app.include_router(pcap_router)
+app.include_router(analyses_router)
 app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:5173'],
                    allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 

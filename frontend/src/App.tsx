@@ -2,7 +2,7 @@ import Login from './components/features/auth/Login';
 import SignUp from './components/features/auth/Signup';
 import Dashboard from './components/global/Dashboard';
 import './App.css';
-import { useState, type ComponentType } from 'react';
+import { lazy, Suspense, useState, type ComponentType } from 'react';
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import UploadFile from './components/business/UploadFile';
 import Profile from './components/business/Profile';
@@ -10,13 +10,14 @@ import AnalysisHistory from './components/business/AnalysisHistory';
 import Anomalies from './components/business/Anomalies';
 import NetworkTraffic from './components/business/NetworkTraffic';
 import Fingerprints from './components/business/Fingerprints';
-import NetworkSubjects from './components/business/NetworkSubjects';
 import PeriodicActivity from './components/business/PeriodicActivity';
 import BehaviorChanges from './components/business/BehaviorChanges';
 import UserManagement from './components/business/UserManagement';
 import AnalyzedTraffic from './components/business/AnalyzedTraffic';
 import ProgramLogs from './components/business/ProgramLogs';
 import { adminSideBarStructure, userSideBarStructure } from './data/sidebar';
+
+const NetworkSubjects = lazy(() => import('./components/business/NetworkSubjects'));
 
 const userPages: Record<string, ComponentType> = {
   'PCAP Analysis': UploadFile,
@@ -46,6 +47,9 @@ function DashboardPage({
   title: string;
   page: ComponentType;
 }) {
+  if (!sessionStorage.getItem('access_token')) {
+    return <Navigate to="/" replace />;
+  }
   const currentRole = sessionStorage.getItem('user_role') === 'admin' ? 'admin' : 'user';
   if (currentRole !== role) {
     return (
@@ -54,7 +58,7 @@ function DashboardPage({
   }
   return (
     <Dashboard targetUser={role} activeTab={title}>
-      <Page />
+      <Suspense fallback={<p role="status">Loading analysis view…</p>}><Page /></Suspense>
     </Dashboard>
   );
 }
