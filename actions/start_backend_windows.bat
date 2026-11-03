@@ -1,5 +1,4 @@
 @echo off
 echo Starting backend
-cd ./backend
-uvicorn main:app --reload
-echo Backend started successfully!
+cd /d "%~dp0..\backend"
+".venv\Scripts\python.exe" -m uvicorn main:app --reload --port 8001

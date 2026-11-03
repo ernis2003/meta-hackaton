@@ -4,9 +4,11 @@ import { faFileArrowUp } from '@fortawesome/free-solid-svg-icons';
 type CardType = {
   fillColor: string;
   children: React.ReactNode;
+  onUseExample?: () => void;
+  disabled?: boolean;
 };
 
-const Card = ({ fillColor, children }: CardType) => {
+const Card = ({ fillColor, children, onUseExample, disabled }: CardType) => {
   return (
     <div className="min-w-0 min-h-44 bg-[#1C2633] flex flex-col gap-4 p-5 rounded-xl">
       <div className="flex">
@@ -14,7 +16,7 @@ const Card = ({ fillColor, children }: CardType) => {
         {children}
       </div>
       <div className="mt-auto ml-auto">
-        <button className="text-center py-2 px-3 !rounded-md bg-[#2B3849] hover:cursor-pointer hover:bg-[#283545]">
+        <button type="button" onClick={onUseExample} disabled={disabled} className="text-center py-2 px-3 !rounded-md bg-[#2B3849] hover:cursor-pointer hover:bg-[#283545]">
           Use Example
         </button>
       </div>
