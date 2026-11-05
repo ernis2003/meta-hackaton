@@ -5,6 +5,7 @@
 JA4+ Network Forensics Analysis helps analysts explore captured network activity, identify suspicious patterns, and understand the evidence behind each finding.
 
 The platform combines **packet analysis**, **network visualization**, **deterministic anomaly detection**, and **local AI explanations** into a persistent investigation workflow.
+<img width="2530" height="1262" alt="image" src="https://github.com/user-attachments/assets/df9ed6b7-913f-406e-a567-f84b24bc38bd" />
 
 ---
 
