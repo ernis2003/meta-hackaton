@@ -37,6 +37,7 @@ export async function fetchAPI<T>(url: string, body: unknown): Promise<T> {
 
 async function authenticate(path: string, data: unknown): Promise<AuthResponse> {
   const result = await fetchAPI<AuthResponse>(`${BACKEND_URL}:${BACKEND_PORT}/api/${path}`, data);
+  sessionStorage.removeItem('analysis_id');
   sessionStorage.setItem('access_token', result.access_token);
   sessionStorage.setItem('user_role', result.user.role);
   return result;
@@ -46,11 +47,12 @@ export function userSignUpAuth(data: SignupData) {
   return authenticate('signup', data);
 }
 
-export function userLoginAuth(email: string, password: string) {
-  return authenticate('login', { email, password });
+export function userLoginAuth(email: string, password: string, role: 'user' | 'admin') {
+  return authenticate('login', { email, password, role });
 }
 
 export function clearAuth() {
+  sessionStorage.removeItem('analysis_id');
   sessionStorage.removeItem('access_token');
   sessionStorage.removeItem('user_role');
 }
