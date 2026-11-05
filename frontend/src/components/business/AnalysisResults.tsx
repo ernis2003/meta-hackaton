@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, selectAnalysis, type Analysis, type Page, type Result } from '../../utils/analyses';
 import AnalysisList from './AnalysisList';
 import EvidenceDetails from './EvidenceDetails';
+import AIInvestigation from './AIInvestigation';
 
 type ResultsProps = {kind: string; title: string; filter?: string[]};
 export default function AnalysisResults(props: ResultsProps) {
@@ -34,6 +35,7 @@ function ResultsView({kind, filter, analysis}: ResultsProps & {analysis: Analysi
           onClick={() => selectAnalysis(analysis.id)}
           to={`/user/networkSubjects?analysis=${encodeURIComponent(analysis.id)}&focus=${encodeURIComponent(String((item.subject_ids as string[])?.[0] || ''))}`}>Focus related hosts</Link>}
         <EvidenceDetails record={item} />
+        {kind === 'anomalies' && <AIInvestigation analysisId={analysis.id} anomalyId={item.id} />}
       </article>)}
       {data.total > 25 && <div className="flex items-center gap-4 text-sm">
         <button disabled={!offset} className="rounded-md bg-[#2B3849] px-3 py-2 disabled:opacity-40" onClick={() => setOffset(Math.max(0, offset - 25))}>Previous</button>

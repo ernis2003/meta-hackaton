@@ -15,6 +15,14 @@ from src.pcap_analysis import analyze_pcap, inspect_runtime
 router = APIRouter(prefix='/api/analyses', tags=['Analyses'])
 KINDS = ('subjects', 'connections', 'fingerprints', 'relationships', 'anomalies')
 EXAMPLE = Path(__file__).resolve().parents[1] / 'examples' / 'zeek-conn-size.pcap'
+SAMPLE_DIR = Path(__file__).resolve().parent / 'data' / 'pcap_samples'
+
+
+def installed_examples():
+    # Fixed allowlist: never interpret a request name as a filesystem path.
+    paths = [EXAMPLE, *(SAMPLE_DIR / name for name in (
+        'normal.pcap', 'suspicious.pcap', 'mixed.pcap', 'foxio-latest.pcapng'))]
+    return {path.name: path for path in paths if path.is_file()}
 
 
 class Analysis(BaseModel):
@@ -46,16 +54,18 @@ class Graph(BaseModel):
 
 @router.get('/examples', response_model=Page)
 def examples(user=Depends(get_current_user)):
-    items = [dict(id=EXAMPLE.name, filename=EXAMPLE.name, size_bytes=EXAMPLE.stat().st_size,
-                  description='Official Zeek connection-size regression capture; contents are not classified as safe or malicious.')] if EXAMPLE.exists() else []
+    items = [dict(id=name, filename=name, size_bytes=path.stat().st_size,
+                  description='Existing capture sample. Filename is not a verified safety or malware verdict.')
+             for name, path in installed_examples().items()]
     return dict(items=items, total=len(items), limit=25, offset=0)
 
 
 @router.post('/examples/{name}', response_model=Analysis, status_code=201)
 def analyze_example(name: str, user=Depends(get_current_user), db=Depends(get_db)):
-    if name != EXAMPLE.name or not EXAMPLE.exists():
+    path = installed_examples().get(name)
+    if path is None:
         raise HTTPException(404, 'Example capture not installed')
-    return create_analysis(UploadFile(filename=EXAMPLE.name, file=EXAMPLE.open('rb')), user, db)
+    return create_analysis(UploadFile(filename=name, file=path.open('rb')), user, db)
 
 
 def get_analysis(db, analysis_id, user):
@@ -113,6 +123,8 @@ def create_analysis(file: UploadFile = File(...), user=Depends(get_current_user)
         first_observed = min((r['ts'] for r in parsed['logs'].get('conn', []) if r.get('ts') is not None), default=None)
         results = build_results(parsed['logs'], baseline_for(db, user['id'], first_observed))
         for kind, capability in results['capabilities'].items():
+            capability['supported'] = (runtime['fingerprints'].get(kind) == 'supported'
+                                       or capability['status'] == 'extracted')
             if capability['status'] != 'extracted':
                 supported = runtime['fingerprints'].get(kind, 'unavailable')
                 capability['status'] = 'no_applicable_traffic' if supported == 'supported' else supported
@@ -185,6 +197,43 @@ def analysis_graph(analysis_id: str, limit: int = Query(300, ge=1, le=1000),
                 metadata[key] = values[:200]
     return dict(nodes=nodes, edges=selected[:2000], total_nodes=total_nodes,
                 total_edges=len(selected), truncated=total_nodes > limit or len(selected) > 2000)
+
+
+@router.get('/{analysis_id}/activity/{subject_id}')
+def subject_activity(analysis_id: str, subject_id: str, user=Depends(get_current_user), db=Depends(get_db)):
+    get_analysis(db, analysis_id, user)
+    subject = next((s for s in entities(db, analysis_id, 'subjects') if s['id'] == subject_id), None)
+    if not subject:
+        raise HTTPException(404, 'Subject not found')
+    rows = db.execute("SELECT data FROM analysis_entities WHERE analysis_id=? AND kind='connections' "
+                      "AND (json_extract(data, '$.source')=? OR json_extract(data, '$.destination')=?)",
+                      (analysis_id, subject['ip_address'], subject['ip_address'])).fetchall()
+    connections = [json.loads(row[0]) for row in rows]
+    timed = [c for c in connections if c.get('timestamp') is not None]
+    start = min((c['timestamp'] for c in timed), default=None)
+    end = max((c.get('last_seen') or c['timestamp'] for c in timed), default=None)
+    interval = max((end - start) / 32, 1) if start is not None else 1
+    buckets = [dict(timestamp=start + i * interval, sent=0, received=0, connections=0)
+               for i in range(32)] if start is not None else []
+    peers = {}
+    for connection in connections:
+        outgoing = connection['source'] == subject['ip_address']
+        connection['subject_sent'] = connection['bytes_sent'] if outgoing else connection['bytes_received']
+        connection['subject_received'] = connection['bytes_received'] if outgoing else connection['bytes_sent']
+        connection['peer'] = connection['destination'] if outgoing else connection['source']
+        peer = peers.setdefault(connection['peer'], dict(ip=connection['peer'], sent=0, received=0, connections=0))
+        for key, value in (('sent', connection['subject_sent']), ('received', connection['subject_received']), ('connections', 1)):
+            peer[key] += value
+        if connection.get('timestamp') is not None:
+            bucket = buckets[min(31, int((connection['timestamp'] - start) / interval))]
+            bucket['sent'] += connection['subject_sent']
+            bucket['received'] += connection['subject_received']
+            bucket['connections'] += 1
+    connections.sort(key=lambda c: c.get('timestamp') or 0, reverse=True)
+    return dict(subject=subject, buckets=buckets, interval_seconds=interval,
+                peers=sorted(peers.values(), key=lambda p: -(p['sent'] + p['received']))[:20],
+                connections=connections[:50], total_connections=len(connections),
+                untimed_connections=len(connections) - len(timed))
 
 
 @router.get('/{analysis_id}/{kind}', response_model=Page)

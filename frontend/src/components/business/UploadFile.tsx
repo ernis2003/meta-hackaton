@@ -8,9 +8,9 @@ import PageLayout from '../shared/PageLayout';
 import { api, selectAnalysis, type Analysis } from '../../utils/analyses';
 
 const cardsInfo = {
-  'Normal Traffic': { Subtitle: 'Clean network traffic example', Color: '#6D98E3', filename: 'normal.pcap' },
-  'Suspicious Traffic': { Subtitle: 'Contains known suspicious patterns', Color: '#F16668', filename: 'suspicious.pcap' },
-  'Mixed Traffic': { Subtitle: 'Realistic enterprice traffic sample', Color: '#9462F1', filename: 'mixed.pcap' },
+  'Normal sample': { Subtitle: 'Analyze existing normal.pcap; filename is not a safety verdict', Color: '#6D98E3', filename: 'normal.pcap' },
+  'Suspicious sample': { Subtitle: 'Analyze existing suspicious.pcap; inspect the evidence', Color: '#F16668', filename: 'suspicious.pcap' },
+  'Mixed sample': { Subtitle: 'Analyze existing mixed.pcap; findings come from Zeek', Color: '#9462F1', filename: 'mixed.pcap' },
 };
 
 export default function UploadFile() {

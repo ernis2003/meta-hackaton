@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import shlex
 import re
+import logging
 from collections import Counter
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -50,9 +51,17 @@ def run_zeek(directory: Path):
                 pass
         raise HTTPException(504, 'Zeek analysis exceeded 120 seconds') from None
     if result.returncode:
-        # Runtime details stay on the server; avoid exposing local paths to clients.
-        raise HTTPException(503 if mode == 'docker' and result.returncode == 125 else 422,
-                            'Zeek could not process the capture. Check the capture and Zeek runtime.')
+        details = (directory / 'stderr.txt').read_text(encoding='utf-8', errors='replace')
+        logging.getLogger(__name__).error('Zeek failed (mode=%s, exit=%s): %s',
+                                         mode, result.returncode, details[-8000:])
+        if mode == 'docker':
+            if any(message in details.lower() for message in (
+                    'cannot connect', 'error during connect', 'is the docker daemon running',
+                    'docker desktop is unable to start')):
+                raise HTTPException(503, 'Docker is not running. Start Docker Desktop and wait for its engine to be ready, then retry.')
+            if result.returncode in (125, 126, 127):
+                raise HTTPException(503, 'Zeek container could not start. Check the configured Docker image and Zeek executable; see backend logs.')
+        raise HTTPException(422, 'Zeek could not process the capture. Check the capture format; see backend logs for details.')
 
 
 def read_logs(directory: Path, limit=MAX_RECORDS_PER_LOG):

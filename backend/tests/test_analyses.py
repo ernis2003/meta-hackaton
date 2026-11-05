@@ -137,6 +137,34 @@ class AnalysisAPITests(unittest.TestCase):
             finally:
                 app.dependency_overrides.pop(get_db, None)
 
+    def test_subject_activity_direction_buckets_and_authorization(self):
+        def logs(directory):
+            records = [conn('out', ts=100, duration=5),
+                       conn('in', ts=120, **{'id.orig_h': '10.0.0.2', 'id.resp_h': '10.0.0.1'}),
+                       conn('untimed', ts=None)]
+            (directory / 'conn.log').write_text('\n'.join(json.dumps(c) for c in records))
+        with patch('src.pcap_analysis.run_zeek', side_effect=logs), patch('src.analyses.inspect_runtime',
+                   return_value=dict(fingerprints=dict(ja4='unsupported', ja4s='unsupported', ja4h='unsupported'))):
+            response = self.upload()
+        self.assertEqual(response.status_code, 201, response.text)
+        aid = response.json()['id']
+        path = f'/api/analyses/{aid}/activity/ip:10.0.0.1'
+        response = self.client.get(path, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        activity = response.json()
+        self.assertEqual(activity['total_connections'], 3)
+        self.assertEqual(activity['untimed_connections'], 1)
+        self.assertEqual(sum(b['sent'] for b in activity['buckets']), 300)
+        self.assertEqual(sum(b['received'] for b in activity['buckets']), 300)
+        self.assertEqual(sum(b['connections'] for b in activity['buckets']), 2)
+        self.assertEqual(activity['peers'][0]['sent'], 400)
+        self.assertEqual(activity['peers'][0]['received'], 500)
+        self.assertEqual(activity['connections'][0]['subject_sent'], 200)
+        self.assertEqual(activity['connections'][0]['peer'], '10.0.0.2')
+        self.assertEqual(self.client.get(path).status_code, 401)
+        self.assertEqual(self.client.get(path, headers=self.other).status_code, 404)
+        self.assertEqual(self.client.get(f'/api/analyses/{aid}/activity/ip:missing', headers=self.headers).status_code, 404)
+
     def fake_zeek(self, directory):
         with closing(connect()) as db:
             self.assertEqual(db.execute('SELECT status FROM analyses ORDER BY uploaded_at DESC').fetchone()[0], 'processing')
@@ -191,9 +219,11 @@ class AnalysisAPITests(unittest.TestCase):
 
     def test_example_uses_real_pipeline_and_cannot_select_arbitrary_paths(self):
         self.assertEqual(self.client.get('/api/analyses/examples').status_code, 401)
-        example = self.client.get('/api/analyses/examples', headers=self.headers).json()['items'][0]
-        with patch('src.pcap_analysis.run_zeek', side_effect=self.fake_zeek), patch('src.analyses.inspect_runtime',
+        sample = Path(self.tmp.name) / 'example.pcap'
+        sample.write_bytes(bytes.fromhex('d4c3b2a1020004000000000000000000ffff000001000000'))
+        with patch('src.analyses.EXAMPLE', sample), patch('src.pcap_analysis.run_zeek', side_effect=self.fake_zeek), patch('src.analyses.inspect_runtime',
                    return_value=dict(fingerprints=dict(ja4='unsupported', ja4s='unsupported', ja4h='unsupported'))):
+            example = self.client.get('/api/analyses/examples', headers=self.headers).json()['items'][0]
             result = self.client.post('/api/analyses/examples/' + example['id'], headers=self.headers)
         self.assertEqual(result.status_code, 201, result.text)
         self.assertEqual(result.json()['status'], 'completed')
@@ -235,9 +265,31 @@ class AnalysisAPITests(unittest.TestCase):
         self.assertEqual(response['status'], 'failed')
         self.assertIn('restart', response['error'])
 
+    @unittest.skipUnless(os.getenv('RUN_JA4_E2E') == '1', 'Set RUN_JA4_E2E=1 with the JA4 image and reference capture installed')
+    def test_real_ja4_ja4s_ja4h_reference_capture(self):
+        from src.analyses import SAMPLE_DIR
+        sample = SAMPLE_DIR / 'foxio-latest.pcapng'
+        response = self.upload(sample.read_bytes(), sample.name)
+        self.assertEqual(response.status_code, 201, response.text)
+        analysis = response.json()
+        for kind in ('ja4', 'ja4s', 'ja4h'):
+            self.assertTrue(analysis['capabilities'][kind]['supported'], kind)
+            self.assertEqual(analysis['capabilities'][kind]['status'], 'extracted')
+        aid = analysis['id']
+        fingerprints = self.client.get(f'/api/analyses/{aid}/fingerprints', headers=self.headers).json()['items']
+        self.assertEqual({item['type'] for item in fingerprints}, {'ja4', 'ja4s', 'ja4h'})
+        self.assertTrue(all(item['value'] and item['sources'] and item['connection_ids'] for item in fingerprints))
+        graph = self.client.get(f'/api/analyses/{aid}/graph', headers=self.headers).json()
+        self.assertTrue({'ja4', 'ja4s', 'ja4h'}.issubset({item['type'] for item in graph['nodes']}))
+        self.assertEqual(self.client.get(f'/api/analyses/{aid}/fingerprints', headers=self.other).status_code, 404)
+        print('REAL_JA4_COUNTS', {kind: sum(f['type'] == kind for f in fingerprints) for kind in ('ja4', 'ja4s', 'ja4h')})
+
     @unittest.skipUnless(os.getenv('RUN_ZEEK_E2E') == '1', 'Set RUN_ZEEK_E2E=1 with Docker/Zeek available')
-    def test_real_official_zeek_capture(self):
+    def test_real_installed_zeek_capture(self):
         capture = Path(__file__).resolve().parents[1] / 'examples' / 'zeek-conn-size.pcap'
+        if not capture.is_file():
+            from src.analyses import SAMPLE_DIR
+            capture = SAMPLE_DIR / 'mixed.pcap'
         content = capture.read_bytes()
         self.assertIn(content[:4], PCAP_MAGIC)
         response = self.upload(content, capture.name)

@@ -8,3 +8,14 @@ data/
 *.sqlite3-wal
 /src/database/migrations/*
 !/src/database/migrations/*.sql
+.venv-ai/
+.venv-ai-wsl/
+src/ai/artifacts/
+src/ai/checkpoints/
+src/ai/results/
+src/ai/datasets/prepared/
+src/ai/datasets/prepared_initial/
+src/ai/datasets/training_data/
+src/ai/datasets/raw/
+*.safetensors
+*.gguf

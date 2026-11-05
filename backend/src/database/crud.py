@@ -14,18 +14,20 @@ def get_user_by_email(db: sqlite3.Connection, email: str):
 
 def list_users(db: sqlite3.Connection, limit: int = 100, offset: int = 0):
     return [dict(row) for row in db.execute(
-        'SELECT * FROM users ORDER BY created_at, id LIMIT ? OFFSET ?', (limit, offset)
+        'SELECT u.*, COUNT(a.id) AS analysis_count FROM users u '
+        'LEFT JOIN analyses a ON a.user_id=u.id GROUP BY u.id '
+        'ORDER BY u.created_at, u.id LIMIT ? OFFSET ?', (limit, offset)
     ).fetchall()]
 
 
 def create_user(db: sqlite3.Connection, *, email: str, name: str, surname: str,
-                hashed_password: str, organization: str = '', role: str = 'user'):
+                hashed_password: str, organization: str = '', role: str = 'user', is_active: bool = True):
     user_id = str(uuid4())
     with db:
         db.execute('''INSERT INTO users
-            (id, email, name, surname, organization, hashed_password, role)
-            VALUES (?, ?, ?, ?, ?, ?, ?)''',
-            (user_id, email.strip().lower(), name, surname, organization, hashed_password, role))
+            (id, email, name, surname, organization, hashed_password, role, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (user_id, email.strip().lower(), name, surname, organization, hashed_password, role, is_active))
     return get_user(db, user_id)
 
 
