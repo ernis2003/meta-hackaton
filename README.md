@@ -1,193 +1,239 @@
 # JA4+ Network Forensics Analysis
 
-FastAPI + React network-forensics prototype: PCAP → Zeek → persistent subjects,
-connections and graph → deterministic anomaly indicators → local Llama
-explanations → Analysis History.
+**Turn packet captures into explainable network investigations with JA4+ fingerprints and fine-tuned Meta Llama.**
 
-## Current verified state
+JA4+ Network Forensics Analysis helps analysts explore captured network activity, identify suspicious patterns, and understand the evidence behind each finding.
 
-Final verification on 2026-11-05 used existing capture files and the actual
-trained adapter. No new traffic, fingerprints or model responses were fabricated.
+The platform combines **packet analysis**, **network visualization**, **deterministic anomaly detection**, and **local AI explanations** into a persistent investigation workflow.
 
-- All three installed examples processed through real Docker/Zeek:
-  normal.pcap: 80 connections, 11 subjects, 10 indicators;
-  suspicious.pcap: 78 connections, 4 subjects, 2 indicators;
-  mixed.pcap: 168 connections, 14 subjects, 7 domains, 12 indicators.
-- Subject, connection, anomaly and graph APIs returned successful responses.
-- The mixed analysis generated a fresh fine-tuned Llama response in 20.11 seconds.
-  Saved-response retrieval and Analysis History reopening passed.
-- Backend suite: all 47 tests passed with RUN_ZEEK_E2E=1 and RUN_JA4_E2E=1, including actual
-  multipart capture upload, Docker/Zeek, persistence and graph reopening.
-  Frontend production build passed.
-- HTTP checks verified API :8001, Transformers :8002 and Vite localhost:5173.
-  The frontend launcher reuses this project's existing healthy dev server.
-- Profile, fingerprint and user-management pages have been browser-checked at
-  desktop/mobile widths; account-management actions were also exercised.
-- The configured JA4 image supports JA4, JA4S and JA4H. The official reference
-  capture yielded 3 JA4, 4 JA4S and 1 JA4H values. See [JA4 setup](backend/zeek/README.md).
+---
 
-An indicator is not a malware verdict. Even the sample named normal.pcap triggers
-periodicity rules. Sample filenames are not verified ground truth.
+## Why This Project?
 
-## Run the existing Windows demo
+Packet captures contain technical evidence, but discovering relationships and deciding what to investigate next takes time.
 
-For a clean container deployment, run `docker compose up --build -d` from the
-repository root, then open **http://localhost:8080**. Docker builds React/Nginx
-and FastAPI with native Zeek and genuine JA4/JA4S/JA4H extraction. SQLite and the
-generated JWT signing key persist in a named volume. No local `.env` is required
-for the core application. The image installs the official FoxIO reference
-capture; local sample captures and model weights are not bundled.
+| Analyst question | What the platform provides |
+| --- | --- |
+| **What communicated?** | Explore subjects, connections, domains, and a network graph. |
+| **Which fingerprints appeared?** | Inspect genuine JA4, JA4S, and JA4H values extracted by Zeek. |
+| **What deserves attention?** | Review explainable indicators such as periodic connections and unusual activity. |
+| **Why was it flagged?** | Ask fine-tuned Meta Llama to interpret recorded evidence and suggest investigation steps. |
+| **Can the investigation be reopened?** | Analyses and generated explanations are saved in SQLite. |
 
-Fine-tuned Llama requires the optional NVIDIA GPU profile, authorized access to
-the base model, and the existing adapter. See [Docker setup](docs/DOCKER.md) for
-GPU/cache configuration, admin creation, persistence, and exact commands. The
-core app works without inference; AI explanations require a reachable model
-service. Muse additionally requires your own API credentials.
+## Meta AI Contribution
 
-From repository root, in separate PowerShell terminals:
+The AI explanation workflow uses **[`meta-llama/Llama-3.2-3B-Instruct`](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)**, fine-tuned locally with **QLoRA**.
 
-```powershell
-.\actions\start_backend_windows.bat
-.\actions\start_frontend_windows.bat
+When an analyst selects an anomaly, the backend retrieves its stored evidence and sends a structured evidence package to the local inference service. The model returns an explanation covering **observations, hypotheses, benign alternatives, and recommended investigation steps**.
+
+The application saves the response, supporting evidence, and model identifiers so the investigation can be reopened later.
+
+> **Detection ≠ explanation.** Deterministic rules flag activity; Llama helps interpret the evidence. Model output requires analyst review.
+
+### Meta Integration Status
+
+| Integration | Status |
+| --- | --- |
+| Llama 3.2 3B Instruct | Live local inference verified |
+| QLoRA adapter | Fine-tuned and loaded successfully |
+| Fresh anomaly explanation | Verified end to end and saved |
+| Before/after evaluation | Completed on 20 fixed authored scenarios |
+| Meta Muse review | Integration implemented; live API request not verified |
+
+---
+
+## Quick Start
+
+### Requirements
+
+- Docker Desktop or Docker Engine
+- Docker Compose v2
+- Linux containers
+
+### 1. Build and Start
+
+Run from the repository root:
+
+```bash
+docker compose up --build -d
 ```
 
-Open **http://localhost:5173**. Use the **User** login tab, or sign up for a
-regular account. Admin accounts have a separate dashboard. Select Mixed sample,
-open a subject in Network Subjects, then open Anomalies → AI Investigation →
-Analyze with Llama. Reopen the analysis through Analysis History. Reports are
-owned by the account that created the analysis.
+### 2. Open the Application
 
-The backend launcher checks Docker, reuses or starts the configured local
-Transformers service, then starts FastAPI. GPU loading can take several minutes.
-Do not start duplicate backend processes. API documentation:
-http://127.0.0.1:8001/docs. Model health: http://127.0.0.1:8002/health.
+- **Web app:** http://localhost:8080 — create an account to begin.
+- **API documentation:** http://localhost:8080/docs
 
-Suggested 3-minute presentation: upload/sample (30s), graph and subject evidence
-(45s), periodic finding and Llama (60s), saved history and limitations (45s).
-Prewarm the model before presenting.
+### Included in the Default Deployment
 
-## Fresh setup
+- React production frontend served by Nginx
+- FastAPI backend
+- Native Zeek with JA4, JA4S, and JA4H support
+- Persistent SQLite storage
+- Automatically generated, persistent JWT signing key
+- Official reference capture for fingerprint extraction
 
-Prerequisites: Python 3.12, Node/npm, and Docker Desktop for Windows Zeek.
-Fine-tuned inference additionally requires an NVIDIA CUDA GPU, the separate AI
-environment, approved access to the gated base model, and the adapter artifacts.
-A fresh clone does not include datasets, model weights, local captures or SQLite.
+> **Note:** The first build needs internet access to download dependencies and pinned upstream reference files. Core capture analysis requires neither a GPU nor a paid API.
 
-```powershell
-py -3.12 -m venv backend/.venv
-.\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
-Copy-Item backend/.env.example backend/.env
-.\backend\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+### 3. Enable Fine-Tuned Llama (Optional)
+
+AI explanations additionally require:
+
+- An NVIDIA GPU with sufficient VRAM
+- Authorized access to `meta-llama/Llama-3.2-3B-Instruct`
+- The completed project adapter
+- Either the optional GPU inference container or a compatible existing local inference service
+
+After configuring the adapter and model access:
+
+```bash
+docker compose --profile gpu up --build -d
 ```
 
-Set JWT_SECRET_KEY in the private backend/.env to the generated value.
-It must be at least 32 bytes. Keep optional ADMIN_EMAIL and ADMIN_PASSWORD empty
-to use signup, or supply your own administrator credentials. Never commit .env.
-ACCESS_TOKEN_EXPIRE_MINUTES is configurable.
+**Model weights and the adapter are not included in Git.** A fresh clone runs the core forensic application, but fine-tuned explanations require these separate artifacts.
 
-```powershell
-.\actions\build_zeek_ja4_windows.bat
-.\backend\.venv\Scripts\python.exe actions/install_ja4_sample.py
-Set-Location frontend
-npm ci
-Set-Location ..
+See **[Docker Setup](docs/DOCKER.md)** for GPU, cache, credentials, administrator, and persistence instructions.
+
+---
+
+## Investigation Workflow
+
+```text
+PCAP / PCAPNG
+      |
+      v
+Zeek + JA4 extraction
+      |
+      v
+Stored connections, subjects, domains, and fingerprints
+      |
+      v
+Network graph + deterministic anomaly indicators
+      |
+      v
+Fine-tuned Llama explanation
+      |
+      v
+Saved analysis and AI report
 ```
 
-The image build and reference-capture installer require network access once;
-capture analysis itself runs offline. The example environment selects
-ZEEK_MODE=docker, ZEEK_DOCKER_IMAGE=forensics-zeek-ja4:local and ZEEK_SCRIPTS=ja4.
-For native Linux/WSL, run the backend there with ZEEK_MODE=native and optionally
-ZEEK_BIN pointing to the installed Zeek binary.
+### Technology Stack
 
-For the existing trained adapter, configure backend/.env:
+| Component | Implementation |
+| --- | --- |
+| **Frontend** | React, TypeScript, Vite, Tailwind |
+| **API** | FastAPI |
+| **Capture processing** | Zeek with FoxIO JA4 scripts |
+| **Fingerprints** | JA4, JA4S, JA4H |
+| **Persistence** | SQLite with automatic schema migrations |
+| **Authentication** | JWT with server-side access controls |
+| **AI inference** | Transformers, PEFT, bitsandbytes |
+| **Deployment** | Docker Compose, Nginx, optional NVIDIA GPU service |
 
-```dotenv
-AI_RUNTIME=transformers
-AI_SERVICE_URL=http://127.0.0.1:8002
-AI_REQUIRE_FINE_TUNED=true
-AI_ADAPTER_PATH=./src/ai/checkpoints/train/adapter
-```
+Analyses belong to the account that created them. Generated explanations are stored alongside their evidence and model metadata.
 
-If the AI environment is missing, backend/setup_ai_windows.bat installs it;
-this requires downloads and is not necessary for the prepared demo machine.
-Do not run training to start the application. Baseline Ollama configuration is
-also supported, but must not be described as fine-tuned inference.
+---
 
-Examples are a fixed allowlist of existing files in
-backend/src/data/pcap_samples/: normal.pcap, suspicious.pcap, mixed.pcap and the
-optional official foxio-latest.pcapng reference capture.
-These local captures remain ignored and are not staged with source. Supply
-legitimately available copies at those paths, or upload your own PCAP/PCAPNG.
-Their original collection provenance is not established here; treat them as
-demonstration evidence, not independently verified real-world attacks.
-The optional official Zeek capture is served only when installed at
-backend/examples/zeek-conn-size.pcap; it is not bundled in this checkout.
+## Verified Results
 
-## Training evidence
+**Verification date: November 5, 2026.**
 
-Base: **meta-llama/Llama-3.2-3B-Instruct**, revision
-0cb88a4f764b7a12671c53f0838cd831a0843b95.
+| Check | Observed result |
+| --- | --- |
+| Docker frontend and backend | Both started and became healthy |
+| Frontend production build | Passed |
+| Official FoxIO reference capture | **33 connections; 3 unique JA4, 4 JA4S, 1 JA4H** |
+| Existing local `mixed.pcap` upload | **168 connections and 12 rule findings** |
+| Network graph | Retrieved successfully |
+| Fine-tuned Llama | Generated a fresh explanation through the container backend using the existing host inference service |
+| Latest measured explanation time | **14.33 seconds** on the prepared machine |
+| AI persistence | Saved explanation retrieved successfully |
+| Analysis History | Both test analyses available |
+| Backend restart | Accounts, JWT session, analyses, and explanation preserved |
+| Backend test suite | Previously verified: **47 tests passed** with real Zeek/JA4 integration checks enabled |
 
-Completed QLoRA artifacts are local at
-backend/src/ai/checkpoints/train/adapter/. Weights:
-adapter_model.safetensors, SHA256
-f055fed559b10804a5c0b1ffc7ea5cdf85b260fad27626b462bc3f8a82bf8bc7.
+> **Verification boundary:** The optional GPU container configuration was validated, but its image build and containerized model loading have **not** been verified. Successful inference used the already running host model service.
 
-Two epochs, 500 optimizer steps, NF4 4-bit, LoRA rank 8/alpha 16.
-Training/validation/test: 2000/250/250 labeled-flow explanations from local
-CTU-13, CIC-style Network Intrusion dataset and the folder named USTC-TFC2016.
-Dataset identities are limited to inspected contents; folder labels alone are
-not provenance. Training labels are supplied in prompts. There is no JA4
-supervision and this is not a validated attack classifier.
+---
 
-Recorded training loss 0.0305802, validation loss 0.00392091, test loss
-0.000221355. Original runtime 3169.8993s; finalization recovered from checkpoint
-500. See training_metrics.json and training_manifest.json rather than treating
-the recovery invocation's elapsed time as the full training time.
+## QLoRA Training and Evaluation
 
-Before/after evaluation: 20 fixed authored scenarios, same protocol/base
-revision. Strict JSON validity improved 4/20 → 12/20, while literal evidence
-coverage decreased 0.85 → 0.525. Reasoning quality is mixed; low loss and valid
-JSON do not establish forensic correctness.
+The adapter was trained on the actual Meta Llama model.
 
-Detailed workflow: [LLAMA_PIPELINE.md](docs/LLAMA_PIPELINE.md).
-Local results, adapters and datasets remain ignored and require a separate
-authorized distribution mechanism for independent reproduction.
+### Training Configuration
 
-## Known limitations
+| Setting | Value |
+| --- | --- |
+| Base model | `meta-llama/Llama-3.2-3B-Instruct` |
+| Base revision | `0cb88a4f764b7a12671c53f0838cd831a0843b95` |
+| Method | QLoRA, NF4 4-bit quantization |
+| LoRA rank / alpha | 8 / 16 |
+| Epochs / optimizer steps | 2 / 500 |
+| Train / validation / test records | 2,000 / 250 / 250 |
+| Local adapter directory | `backend/src/ai/checkpoints/train/adapter/` |
 
-- The configured JA4 image extracts genuine JA4/JA4S/JA4H values. The original
-  three local samples have no TLS ServerHello and therefore no JA4S, despite
-  runtime support. Use the official reference capture to demonstrate all three.
-  Historical analyses retain their original runtime capability metadata;
-  reanalysis creates new results without deleting old evidence or AI reports.
-- Muse review code, bounded read-only tools and persistence exist, but live
-  review is unavailable without MODEL_API_KEY (or META_MUSE_API_KEY). No
-  successful live Muse request is claimed. No credentials are bundled.
-- Detection uses explainable volume/frequency/periodicity/novelty rules.
-  Behavioral novelty needs earlier captures for the same user.
-- SQLite schema v3 migrates automatically. Jobs are synchronous, intended for
-  one worker; no distributed queue or automatic retry.
-- Captures are limited to 100 MiB; Zeek timeout is 120s; logs are capped at
-  200 MiB. Temporary captures/logs are removed. IP byte/packet totals describe
-  conn.log, not every capture frame.
-- CORS is configured for localhost:5173. Use the documented browser URL.
-- Admin traffic/log pages and password recovery are unfinished; avoid them in
-  the demo. Existing frontend lint findings remain; build success does not
-  imply lint success.
+Training used labeled-flow explanations derived from inspected local CTU-13 data, CIC-style intrusion-flow CSVs, and CSVs stored in a folder named `USTC-TFC2016`. Dataset identity is **not** assumed from folder names alone.
 
-## Tests
+**Training scope:** Labeled-flow explanation, not JA4 supervision. These results do **not** establish attack-classification accuracy.
 
-```powershell
-Set-Location backend
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-# Opt-in real capture test; requires an installed sample and working Docker:
-$env:RUN_ZEEK_E2E='1'
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-Set-Location ../frontend
-npm run build
-npm run lint
-```
+### Before vs. After Fine-Tuning
 
-Never stage credentials, SQLite, capture datasets, model weights or private
-evaluation evidence. No Git commit or push is performed by the setup scripts.
+Evaluation used **20 fixed authored scenarios** with the same base revision and evaluation protocol.
+
+| Metric | Base model | Fine-tuned model |
+| --- | ---: | ---: |
+| Strict JSON validity | 4/20 | **12/20** |
+| Literal evidence coverage proxy | **0.85** | 0.525 |
+
+Fine-tuning improved output-format compliance, while measured evidence coverage decreased. **Results are mixed and do not establish improved forensic correctness.**
+
+For training manifests, adapter checksums, evaluation scripts, and the detailed procedure, see **[Llama Pipeline](docs/LLAMA_PIPELINE.md)**. Generated artifacts remain local and require separate authorized distribution for independent reproduction.
+
+---
+
+## Genuine JA4+ Fingerprint Extraction
+
+Fingerprint values come from **actual Zeek output**, not generated examples.
+
+| Fingerprint | Purpose |
+| --- | --- |
+| **JA4** | TLS client fingerprint |
+| **JA4S** | TLS server fingerprint |
+| **JA4H** | HTTP client fingerprint |
+
+A supported fingerprint type may still return zero results if the necessary traffic is absent. For example, captures without TLS ServerHello messages cannot yield JA4S values.
+
+The official reference capture demonstrates all three types. See **[JA4 Setup and Reference Capture](backend/zeek/README.md)**.
+
+---
+
+## Current Scope and Limitations
+
+- Findings are **triage indicators**, not malware verdicts. Sample filenames do not establish ground truth.
+- Llama explanations can contain mistakes and require review against recorded evidence.
+- Meta Muse review code and persistence are implemented, but no successful live Muse request is claimed.
+- Behavioral novelty comparisons require earlier analyses for the same user.
+- Processing is synchronous and intended for a single backend worker.
+- Uploads are limited to **100 MiB**, with a **120-second** Zeek processing timeout.
+- Administrator traffic/log pages and password recovery are unfinished.
+- Frontend production builds pass; existing lint findings remain.
+- This is a **hackathon prototype**, not a production-certified intrusion detection system.
+
+## Repository and Data Boundaries
+
+The repository contains application source, deployment configuration, training and evaluation code, and documentation.
+
+The repository **excludes** private credentials, SQLite databases, local capture datasets, base-model weights, and adapter weights. Docker downloads the pinned official reference capture during its build.
+
+## Documentation
+
+| Guide | Description |
+| --- | --- |
+| [Docker Deployment](docs/DOCKER.md) | Setup, GPU, credentials, administration, and persistence |
+| [Llama Training and Inference](docs/LLAMA_PIPELINE.md) | Training, evaluation, and inference procedure |
+| [JA4 Extraction](backend/zeek/README.md) | Zeek integration and reference capture |
+
+---
+
+### Project Outcome
+
+**A packet capture becomes a persistent, evidence-based investigation:** extracted JA4+ fingerprints, linked network activity, explainable rule findings, and a fresh explanation from a genuinely fine-tuned Meta Llama model.
